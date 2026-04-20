@@ -1,0 +1,5 @@
+# codigo|nome|quantidade|preco|localizacao|busca
+D001|Mouse sem fio|10|89.900000|Prateleira A1|mouse sem fio
+7|teste|2|120.000000|2|
+1|garsa|3|30.000000|estante a|
+2|filipe|3|10.000000|corredor A|
