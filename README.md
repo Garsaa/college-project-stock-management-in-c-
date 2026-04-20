@@ -109,6 +109,26 @@ g++ -std=c++17 -Wall -Wextra -Iinclude src/*.cpp -o estoque.exe
 .\estoque.exe
 ```
 
+## Como gerar o diagrama de classes
+
+O diagrama foi gerado com Doxygen e Graphviz. Para atualizar os arquivos depois
+de mudar o codigo, execute:
+
+```powershell
+.\docs\gerar_diagramas.ps1
+```
+
+Arquivos gerados para o relatorio:
+
+- `docs/diagrama_classes_graphviz.pdf`
+- `docs/diagrama_classes_graphviz.svg`
+
+A documentacao navegavel gerada pelo Doxygen fica em:
+
+```text
+docs/doxygen/html/index.html
+```
+
 ## Arquivo de dados
 
 O programa cria o arquivo `data/estoque.txt` automaticamente ao salvar.
