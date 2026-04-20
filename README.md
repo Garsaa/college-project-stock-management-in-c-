@@ -1,7 +1,7 @@
 # Modulo de Estoque - Trabalho Final POO
 
 Projeto em C++ para a etapa 1 do trabalho final: aplicacao de console com
-cadastro de itens de estoque e persistencia em arquivo.
+controle de inventario, entradas e saidas de produtos ou materiais.
 
 ## Funcionalidades
 
@@ -9,34 +9,58 @@ cadastro de itens de estoque e persistencia em arquivo.
 - Apagar item.
 - Mostrar item por codigo.
 - Localizar item por codigo ou parte do nome.
-- Modificar item.
+- Modificar dados cadastrais do item.
+- Registrar entrada de item.
+- Registrar saida de item.
 - Salvar itens em arquivo texto (`data/estoque.txt`).
 - Carregar automaticamente os itens do arquivo ao iniciar.
 - Imprimir listagem de itens no console.
-- Abrir o navegador para buscar o item na internet.
+- Abrir o navegador usando o link de informacoes do item.
+
+## Informacoes armazenadas
+
+- Id/codigo do item.
+- Tipo: produto ou material.
+- Nome do item.
+- Descricao do item.
+- Link para informacoes do item com imagem.
+- Quantidade atual do item.
+- Registro de entradas e saidas.
+- Preco unitario e localizacao no estoque, como campos auxiliares.
 
 ## Conceitos de POO usados
 
 - Classe base: `ItemEstoque`.
 - Heranca: `Produto` herda de `ItemEstoque`.
 - Polimorfismo: o estoque guarda `std::unique_ptr<ItemEstoque>` e chama metodos
-  virtuais como `imprimirResumo` e `imprimirDetalhado`.
+  virtuais como `tipo`, `imprimirResumo` e `imprimirDetalhado`.
 - Encapsulamento: atributos privados com metodos de acesso e alteracao.
 
 ## Diagrama de classes
 
 ```mermaid
 classDiagram
+    class MovimentoEstoque {
+        +string operacao
+        +int quantidade
+        +string observacao
+    }
+
     class ItemEstoque {
         <<abstract>>
         -string codigo
+        -string tipoItem
         -string nome
+        -string descricao
+        -string linkInformacoes
         -int quantidade
         -double precoUnitario
         -string localizacao
-        -string termoBusca
+        -vector~MovimentoEstoque~ movimentos
         +valorTotal() double
         +alvoBuscaInternet() string
+        +registrarEntrada(int, string) void
+        +registrarSaida(int, string) void
         +tipo() string
         +imprimirResumo(ostream) void
         +imprimirDetalhado(ostream) void
@@ -63,6 +87,7 @@ classDiagram
     }
 
     ItemEstoque <|-- Produto
+    ItemEstoque o-- MovimentoEstoque
     Estoque o-- ItemEstoque
     PersistenciaArquivo ..> Estoque
 ```
@@ -86,15 +111,17 @@ g++ -std=c++17 -Wall -Wextra -Iinclude src/*.cpp -o estoque.exe
 
 ## Arquivo de dados
 
-O programa cria o arquivo `data/estoque.txt` automaticamente ao salvar. Cada
-linha guarda um item em formato separado por `|`:
+O programa cria o arquivo `data/estoque.txt` automaticamente ao salvar.
+O formato usa uma linha para o item e uma linha para cada movimento:
 
 ```text
-codigo|nome|quantidade|preco|localizacao|busca
+ITEM|codigo|tipo|nome|descricao|linkInformacoes|quantidade|preco|localizacao
+MOV|codigo|operacao|quantidade|observacao
 ```
 
 Exemplo:
 
 ```text
-D001|Mouse sem fio|10|89.900000|Prateleira A1|mouse sem fio
+ITEM|D001|produto|Mouse sem fio|Mouse sem fio para computadores.|https://www.google.com/search?tbm=isch&q=mouse+sem+fio|10|89.900000|Prateleira A1
+MOV|D001|Entrada|10|Cadastro inicial.
 ```

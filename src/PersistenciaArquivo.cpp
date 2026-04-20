@@ -54,18 +54,32 @@ void PersistenciaArquivo::salvar(const Estoque& estoque) const {
         throw std::runtime_error("Nao foi possivel abrir o arquivo para escrita: " + caminhoArquivo_);
     }
 
-    arquivo << "# codigo|nome|quantidade|preco|localizacao|busca\n";
+    arquivo << "# ITEM|codigo|tipo|nome|descricao|linkInformacoes|quantidade|preco|localizacao\n";
+    arquivo << "# MOV|codigo|operacao|quantidade|observacao\n";
     for (const auto& item : estoque.itens()) {
         std::vector<std::string> campos = {
+            "ITEM",
             item->codigo(),
+            item->tipo(),
             item->nome(),
+            item->descricao(),
+            item->linkInformacoes(),
             std::to_string(item->quantidade()),
             std::to_string(item->precoUnitario()),
-            item->localizacao(),
-            item->termoBusca()
+            item->localizacao()
         };
 
         arquivo << juntarCampos(campos) << '\n';
+
+        for (const auto& movimento : item->movimentos()) {
+            arquivo << juntarCampos({
+                "MOV",
+                item->codigo(),
+                movimento.operacao,
+                std::to_string(movimento.quantidade),
+                movimento.observacao
+            }) << '\n';
+        }
     }
 }
 
@@ -86,9 +100,23 @@ bool PersistenciaArquivo::carregar(Estoque& estoque) const {
         }
 
         try {
-            auto item = criarItem(dividirLinha(linha));
-            if (!temporario.adicionar(std::move(item))) {
-                throw std::runtime_error("codigo duplicado");
+            const auto campos = dividirLinha(linha);
+            if (!campos.empty() && campos[0] == "MOV") {
+                if (campos.size() < 5) {
+                    throw std::runtime_error("movimento deve ter 5 campos");
+                }
+
+                auto* item = temporario.localizarPorCodigo(campos[1]);
+                if (item == nullptr) {
+                    throw std::runtime_error("movimento sem item correspondente");
+                }
+
+                item->adicionarRegistroMovimento(campos[2], std::stoi(campos[3]), campos[4]);
+            } else {
+                auto item = criarItem(campos);
+                if (!temporario.adicionar(std::move(item))) {
+                    throw std::runtime_error("codigo duplicado");
+                }
             }
         } catch (const std::exception& erro) {
             std::ostringstream mensagem;
@@ -106,6 +134,26 @@ const std::string& PersistenciaArquivo::caminhoArquivo() const {
 }
 
 std::unique_ptr<ItemEstoque> PersistenciaArquivo::criarItem(const std::vector<std::string>& campos) const {
+    if (campos.empty()) {
+        throw std::runtime_error("linha vazia");
+    }
+
+    if (campos[0] == "ITEM") {
+        if (campos.size() < 9) {
+            throw std::runtime_error("item deve ter 9 campos");
+        }
+
+        return std::make_unique<Produto>(
+            campos[1],
+            campos[2],
+            campos[3],
+            campos[4],
+            campos[5],
+            std::stoi(campos[6]),
+            std::stod(campos[7]),
+            campos[8]);
+    }
+
     if (campos.size() < 5) {
         throw std::runtime_error("quantidade de campos insuficiente");
     }
@@ -115,13 +163,30 @@ std::unique_ptr<ItemEstoque> PersistenciaArquivo::criarItem(const std::vector<st
     const int quantidade = std::stoi(campos[2]);
     const double preco = std::stod(campos[3]);
     const auto& localizacao = campos[4];
-    const std::string termoBusca = campos.size() >= 6 ? campos[5] : "";
+    std::string linkInformacoes = campos.size() >= 6 ? campos[5] : "";
+    if (linkInformacoes.empty()) {
+        std::string nomeBusca = nome;
+        for (auto& caractere : nomeBusca) {
+            if (caractere == ' ') {
+                caractere = '+';
+            }
+        }
+        linkInformacoes = "https://www.google.com/search?tbm=isch&q=" + nomeBusca;
+    }
 
-    return std::make_unique<Produto>(
+    auto item = std::make_unique<Produto>(
         codigo,
+        "produto",
         nome,
+        "Descricao importada do formato antigo.",
+        linkInformacoes,
         quantidade,
         preco,
-        localizacao,
-        termoBusca);
+        localizacao);
+
+    if (quantidade > 0) {
+        item->adicionarRegistroMovimento("Entrada", quantidade, "Importado do arquivo antigo.");
+    }
+
+    return item;
 }

@@ -66,12 +66,13 @@ void abrirUrlNoNavegador(const std::string& url) {
 
 void imprimirCabecalhoListagem() {
     std::cout << std::left << std::setw(12) << "Codigo"
-              << std::setw(30) << "Nome"
+              << std::setw(12) << "Tipo"
+              << std::setw(28) << "Nome"
               << std::right << std::setw(8) << "Qtd"
               << std::setw(14) << "Preco"
               << std::setw(14) << "Total"
               << "  Localizacao\n";
-    std::cout << std::string(92, '-') << '\n';
+    std::cout << std::string(102, '-') << '\n';
 }
 
 void listarItens(const Estoque& estoque) {
@@ -88,8 +89,46 @@ void listarItens(const Estoque& estoque) {
         totalGeral += item->valorTotal();
     }
 
-    std::cout << std::string(92, '-') << '\n';
+    std::cout << std::string(102, '-') << '\n';
     std::cout << "Valor total em estoque: R$ " << console::formatarMoeda(totalGeral) << '\n';
+}
+
+std::string lerTipoItem() {
+    std::cout << "Tipo do item:\n";
+    std::cout << "1 - Produto\n";
+    std::cout << "2 - Material\n";
+
+    const int opcao = console::lerInteiro("Escolha: ", 1);
+    if (opcao == 1) {
+        return "produto";
+    }
+    if (opcao == 2) {
+        return "material";
+    }
+
+    throw std::invalid_argument("Tipo invalido.");
+}
+
+std::string lerTipoItemOpcional(const std::string& valorAtual) {
+    std::cout << "Tipo do item [" << valorAtual << "]\n";
+    std::cout << "1 - Produto\n";
+    std::cout << "2 - Material\n";
+    std::cout << "ENTER - Manter atual\n";
+    std::cout << "Escolha: ";
+
+    std::string entrada;
+    std::getline(std::cin, entrada);
+    if (entrada.empty()) {
+        return valorAtual;
+    }
+    if (entrada == "1") {
+        return "produto";
+    }
+    if (entrada == "2") {
+        return "material";
+    }
+
+    throw std::invalid_argument("Tipo invalido.");
 }
 
 void adicionarItem(Estoque& estoque) {
@@ -99,22 +138,27 @@ void adicionarItem(Estoque& estoque) {
         return;
     }
 
+    const std::string tipoItem = lerTipoItem();
     const std::string nome = console::lerLinha("Nome: ");
+    const std::string descricao = console::lerLinha("Descricao: ");
+    const std::string linkInformacoes = console::lerLinha("Link de informacoes com imagem: ");
     const int quantidade = console::lerInteiro("Quantidade: ", 0);
     const double preco = console::lerDouble("Preco unitario: R$ ", 0.0);
     const std::string localizacao = console::lerLinha("Localizacao no estoque: ");
 
-    std::cout << "Termo de busca/link (ENTER para usar o nome do item): ";
-    std::string termoBusca;
-    std::getline(std::cin, termoBusca);
-
     auto novoItem = std::make_unique<Produto>(
         codigo,
+        tipoItem,
         nome,
+        descricao,
+        linkInformacoes,
         quantidade,
         preco,
-        localizacao,
-        termoBusca);
+        localizacao);
+
+    if (quantidade > 0) {
+        novoItem->adicionarRegistroMovimento("Entrada", quantidade, "Cadastro inicial.");
+    }
 
     if (estoque.adicionar(std::move(novoItem))) {
         std::cout << "Item adicionado com sucesso.\n";
@@ -193,13 +237,44 @@ void modificarItem(Estoque& estoque) {
     item->imprimirDetalhado(std::cout);
     std::cout << "\nDigite ENTER para manter o valor atual.\n";
 
+    item->setTipoItem(lerTipoItemOpcional(item->tipo()));
     item->setNome(console::lerLinhaOpcional("Nome", item->nome()));
-    item->setQuantidade(console::lerInteiroOpcional("Quantidade", item->quantidade(), 0));
+    item->setDescricao(console::lerLinhaOpcional("Descricao", item->descricao()));
+    item->setLinkInformacoes(console::lerLinhaOpcional("Link de informacoes", item->linkInformacoes()));
     item->setPrecoUnitario(console::lerDoubleOpcional("Preco unitario", item->precoUnitario(), 0.0));
     item->setLocalizacao(console::lerLinhaOpcional("Localizacao", item->localizacao()));
-    item->setTermoBusca(console::lerLinhaOpcional("Termo/link de busca", item->termoBusca()));
 
     std::cout << "Item modificado.\n";
+}
+
+void registrarEntrada(Estoque& estoque) {
+    const std::string codigo = console::lerLinha("Codigo do item: ");
+    auto* item = estoque.localizarPorCodigo(codigo);
+    if (item == nullptr) {
+        std::cout << "Item nao encontrado.\n";
+        return;
+    }
+
+    const int quantidade = console::lerInteiro("Quantidade de entrada: ", 1);
+    const std::string observacao = console::lerLinha("Observacao: ");
+    item->registrarEntrada(quantidade, observacao);
+
+    std::cout << "Entrada registrada. Quantidade atual: " << item->quantidade() << ".\n";
+}
+
+void registrarSaida(Estoque& estoque) {
+    const std::string codigo = console::lerLinha("Codigo do item: ");
+    auto* item = estoque.localizarPorCodigo(codigo);
+    if (item == nullptr) {
+        std::cout << "Item nao encontrado.\n";
+        return;
+    }
+
+    const int quantidade = console::lerInteiro("Quantidade de saida: ", 1);
+    const std::string observacao = console::lerLinha("Observacao: ");
+    item->registrarSaida(quantidade, observacao);
+
+    std::cout << "Saida registrada. Quantidade atual: " << item->quantidade() << ".\n";
 }
 
 void buscarNaInternet(Estoque& estoque) {
@@ -236,9 +311,11 @@ void imprimirMenu() {
     std::cout << "3 - Mostrar item\n";
     std::cout << "4 - Localizar item\n";
     std::cout << "5 - Modificar item\n";
-    std::cout << "6 - Salvar itens em arquivo\n";
-    std::cout << "7 - Imprimir listagem de itens\n";
-    std::cout << "8 - Buscar item na internet\n";
+    std::cout << "6 - Registrar entrada de item\n";
+    std::cout << "7 - Registrar saida de item\n";
+    std::cout << "8 - Salvar itens em arquivo\n";
+    std::cout << "9 - Imprimir listagem de itens\n";
+    std::cout << "10 - Buscar item na internet\n";
     std::cout << "0 - Sair\n";
 }
 
@@ -277,12 +354,18 @@ int main() {
                 modificarItem(estoque);
                 break;
             case 6:
-                salvarItens(persistencia, estoque);
+                registrarEntrada(estoque);
                 break;
             case 7:
-                listarItens(estoque);
+                registrarSaida(estoque);
                 break;
             case 8:
+                salvarItens(persistencia, estoque);
+                break;
+            case 9:
+                listarItens(estoque);
+                break;
+            case 10:
                 buscarNaInternet(estoque);
                 break;
             case 0:
