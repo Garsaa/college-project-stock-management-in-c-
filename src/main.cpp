@@ -31,6 +31,19 @@ std::string sslModeLabel(const AppConfig& config) {
     return config.database.sslMode.empty() ? "disabled" : config.database.sslMode;
 }
 
+void applyCorsHeaders(
+    const drogon::HttpResponsePtr& response,
+    const CorsConfig& cors) {
+    response->addHeader("Access-Control-Allow-Origin", cors.allowedOrigin);
+    response->addHeader("Access-Control-Allow-Methods", cors.allowedMethods);
+    response->addHeader("Access-Control-Allow-Headers", cors.allowedHeaders);
+    response->addHeader("Access-Control-Max-Age", cors.maxAge);
+
+    if (cors.allowedOrigin != "*") {
+        response->addHeader("Vary", "Origin");
+    }
+}
+
 void printStartupSummary(const AppConfig& config, std::size_t threadCount) {
     const std::vector<std::pair<std::string, std::string>> rows = {
         {"URL", displayUrl(config)},
@@ -43,6 +56,7 @@ void printStartupSummary(const AppConfig& config, std::size_t threadCount) {
                           std::to_string(config.database.connections) + ")"},
         {"SSL", sslModeLabel(config)},
         {"Charset", config.database.charset},
+        {"CORS", config.cors.allowedOrigin},
     };
 
     std::cout << "\n+--------------------------------------------------------------+\n";
@@ -94,6 +108,30 @@ int main() {
 
         logStartupStep("Registering HTTP listener...");
         drogon::app().addListener(config.listenHost, config.listenPort);
+        logStartupStep("Registering CORS policy...");
+        const auto corsConfig = config.cors;
+        drogon::app().registerPreRoutingAdvice(
+            [corsConfig](
+                const drogon::HttpRequestPtr& req,
+                drogon::AdviceCallback&& callback,
+                drogon::AdviceChainCallback&& chainCallback) {
+                if (req->method() == drogon::HttpMethod::Options) {
+                    auto response = drogon::HttpResponse::newHttpResponse();
+                    response->setStatusCode(drogon::k204NoContent);
+                    applyCorsHeaders(response, corsConfig);
+                    callback(response);
+                    return;
+                }
+
+                chainCallback();
+            });
+        drogon::app().registerPreSendingAdvice(
+            [corsConfig](
+                const drogon::HttpRequestPtr& req,
+                const drogon::HttpResponsePtr& response) {
+                (void)req;
+                applyCorsHeaders(response, corsConfig);
+            });
         logStartupStep("Registering PostgreSQL client...");
         drogon::app().createDbClient(
             "postgresql",

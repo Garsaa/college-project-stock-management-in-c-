@@ -51,6 +51,10 @@ At startup, the API creates the `estoque_items` and
 `estoque_inventory_movements` tables and their indexes if they do not exist
 yet by executing `sql/schema.sql`.
 
+The API also applies a global CORS policy. By default it allows `*`, which is
+useful for the Vercel frontend. If you want to lock it down, set
+`CORS_ALLOWED_ORIGIN` to your frontend URL.
+
 ## Docker
 The repository includes a multi-stage `Dockerfile` for Linux environments such
 as Render. The application now accepts `PORT` as a fallback to `APP_PORT`,

@@ -20,11 +20,19 @@ struct DatabaseConfig {
     std::string sslMode;
 };
 
+struct CorsConfig {
+    std::string allowedOrigin = "*";
+    std::string allowedMethods = "GET, POST, PATCH, DELETE, OPTIONS";
+    std::string allowedHeaders = "Content-Type, Authorization";
+    std::string maxAge = "86400";
+};
+
 struct AppConfig {
     std::string listenHost = "0.0.0.0";
     std::uint16_t listenPort = 2020;
     std::size_t threads = 0;
     DatabaseConfig database;
+    CorsConfig cors;
 
     static AppConfig loadFromEnvironment();
     std::string connectionString() const;

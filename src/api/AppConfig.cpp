@@ -203,6 +203,11 @@ AppConfig AppConfig::loadFromEnvironment() {
     config.database.autoBatch = readBool("POSTGRES_AUTO_BATCH", config.database.autoBatch);
     config.database.sslMode = readEnv("POSTGRES_SSLMODE", config.database.sslMode);
 
+    config.cors.allowedOrigin = readEnv("CORS_ALLOWED_ORIGIN", config.cors.allowedOrigin);
+    config.cors.allowedMethods = readEnv("CORS_ALLOWED_METHODS", config.cors.allowedMethods);
+    config.cors.allowedHeaders = readEnv("CORS_ALLOWED_HEADERS", config.cors.allowedHeaders);
+    config.cors.maxAge = readEnv("CORS_MAX_AGE", config.cors.maxAge);
+
     return config;
 }
 
