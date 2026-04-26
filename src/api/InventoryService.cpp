@@ -1,6 +1,7 @@
 #include "api/InventoryService.hpp"
 
 #include "api/ApiError.hpp"
+#include "api/ItemTypeProfile.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -158,11 +159,9 @@ std::string requireText(const std::string& value, const char* fieldName) {
 }
 
 std::string normalizeItemType(const std::string& value) {
-    const auto text = toLower(requireText(value, "item_type"));
-    if (text != "product" && text != "material") {
-        throw ApiError(400, "The 'item_type' field must be 'product' or 'material'.");
-    }
-    return text;
+    // This keeps a small but real polymorphic hierarchy in the backend domain:
+    // each item type resolves to its own profile implementation at runtime.
+    return makeItemTypeProfile(requireText(value, "item_type"))->storageValue();
 }
 
 void validateUnitPrice(double unitPrice) {
@@ -205,9 +204,10 @@ bool looksLikeDuplicateError(const DrogonDbException& error) {
 
 InventoryItemSummaryDto mapSummaryRow(const drogon::orm::Row& row) {
     InventoryItemSummaryDto item;
+    const auto itemType = makeItemTypeProfile(row["item_type"].as<std::string>());
     item.id = row["id"].as<std::int64_t>();
     item.code = row["code"].as<std::string>();
-    item.itemType = row["item_type"].as<std::string>();
+    item.itemType = itemType->storageValue();
     item.name = row["name"].as<std::string>();
     item.quantity = row["quantity"].as<int>();
     item.unitPrice = row["unit_price"].as<double>();
@@ -219,9 +219,10 @@ InventoryItemSummaryDto mapSummaryRow(const drogon::orm::Row& row) {
 
 InventoryItemDetailsDto mapDetailsRow(const drogon::orm::Row& row) {
     InventoryItemDetailsDto item;
+    const auto itemType = makeItemTypeProfile(row["item_type"].as<std::string>());
     item.id = row["id"].as<std::int64_t>();
     item.code = row["code"].as<std::string>();
-    item.itemType = row["item_type"].as<std::string>();
+    item.itemType = itemType->storageValue();
     item.name = row["name"].as<std::string>();
     item.description = row["description"].as<std::string>();
     item.informationLink = row["information_link"].as<std::string>();
@@ -246,10 +247,11 @@ InventoryMovementDto mapMovementRow(const drogon::orm::Row& row) {
 
 InventoryMovementHistoryDto mapMovementHistoryRow(const drogon::orm::Row& row) {
     InventoryMovementHistoryDto movement;
+    const auto itemType = makeItemTypeProfile(row["item_type"].as<std::string>());
     movement.id = row["id"].as<std::int64_t>();
     movement.itemId = row["item_id"].as<std::int64_t>();
     movement.itemCode = row["item_code"].as<std::string>();
-    movement.itemType = row["item_type"].as<std::string>();
+    movement.itemType = itemType->storageValue();
     movement.itemName = row["item_name"].as<std::string>();
     movement.operation = row["operation"].as<std::string>();
     movement.quantity = row["quantity"].as<int>();

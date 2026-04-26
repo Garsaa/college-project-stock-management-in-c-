@@ -12,6 +12,7 @@ find_package(Drogon CONFIG REQUIRED)
 add_executable(inventory_api
     src/main.cpp
     src/api/AppConfig.cpp
+    src/api/ItemTypeProfile.cpp
     src/api/InventoryService.cpp
     src/http/InventoryController.cpp
 )
