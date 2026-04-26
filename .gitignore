@@ -7,5 +7,7 @@ docs/doxygen/
 *.a
 *.dll
 *.pdb
+*.log
+.env
 .vs/
 .vscode/

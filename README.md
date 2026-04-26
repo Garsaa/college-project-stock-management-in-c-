@@ -1,91 +1,188 @@
-# Modulo de Estoque - Trabalho Final POO
+## Features
+- Create inventory items.
+- List stock movements.
+- List items.
+- Get an item by code.
+- Filter items by code or partial name.
+- Update item metadata.
+- Register inbound stock.
+- Register outbound stock.
+- Delete items.
+- Keep item movement history in the database.
 
-Projeto em C++ para a etapa 1 do trabalho final: aplicacao de console com
-controle de inventario, entradas e saidas de produtos ou materiais.
+## Stack
+- `C++20`
+- `Drogon`
+- `PostgreSQL`
+- `CMake`
+- `MinGW`
 
-## Funcionalidades
+## Responsibilities
 
-- Adicionar item.
-- Apagar item.
-- Mostrar item por codigo.
-- Localizar item por codigo ou parte do nome.
-- Modificar dados cadastrais do item.
-- Registrar entrada de item.
-- Registrar saida de item.
-- Salvar itens em arquivo texto (`data/estoque.txt`).
-- Carregar automaticamente os itens do arquivo ao iniciar.
-- Imprimir listagem de itens no console.
-- Abrir o navegador usando o link de informacoes do item.
+- `src/main.cpp`
+  Starts the application, ensures the schema exists, and boots `Drogon`.
+- `src/api/AppConfig.cpp`
+  Loads `.env`, reads environment variables, and builds the PostgreSQL configuration.
+- `src/api/InventoryService.cpp`
+  Holds business rules and SQL access.
+- `src/http/InventoryController.cpp`
+  Maps HTTP requests and JSON payloads to the service layer.
+- `sql/schema.sql`
+  Startup schema source used by the application.
 
-## Informacoes armazenadas
+## Build
+```powershell
+cmake -S . -B build-api -G "MinGW Makefiles" `
+  -DCMAKE_BUILD_TYPE=Release `
+  -DCMAKE_TOOLCHAIN_FILE=C:/codex-vcpkg/scripts/buildsystems/vcpkg.cmake `
+  -DVCPKG_TARGET_TRIPLET=x64-mingw-dynamic `
+  -DVCPKG_HOST_TRIPLET=x64-mingw-dynamic
 
-- Id/codigo do item.
-- Tipo: produto ou material.
-- Nome do item.
-- Descricao do item.
-- Link para informacoes do item com imagem.
-- Quantidade atual do item.
-- Registro de entradas e saidas.
-- Preco unitario e localizacao no estoque, como campos auxiliares.
-
-## Conceitos de POO usados
-
-- Classe base: `ItemEstoque`.
-- Heranca: `Produto` herda de `ItemEstoque`.
-- Polimorfismo: o estoque guarda `std::unique_ptr<ItemEstoque>` e chama metodos
-  virtuais como `tipo`, `imprimirResumo` e `imprimirDetalhado`.
-- Encapsulamento: atributos privados com metodos de acesso e alteracao.
-
-## Como compilar e executar
-
-### Com CMake
-
-```bash
-cmake -S . -B build-mingw -G "MinGW Makefiles"
-cmake --build build-mingw
-.\build-mingw\estoque.exe
+cmake --build build-api -j 8
 ```
 
-### Com g++ diretamente
+## Run
+The API loads a local `.env` file automatically from the project root. Use
+`.env.example` as the template and keep the real values in `.env`.
 
-```bash
-g++ -std=c++17 -Wall -Wextra -Iinclude src/*.cpp -o estoque.exe
-.\estoque.exe
-```
+.\build-api\inventory_api.exe
 
-## Como gerar o diagrama de classes
+At startup, the API creates the `estoque_items` and
+`estoque_inventory_movements` tables and their indexes if they do not exist
+yet by executing `sql/schema.sql`.
 
-O diagrama foi gerado com Doxygen e Graphviz. Para atualizar os arquivos depois
-de mudar o codigo, execute:
+## Docker
+The repository includes a multi-stage `Dockerfile` for Linux environments such
+as Render. The application now accepts `PORT` as a fallback to `APP_PORT`,
+which helps on platforms that inject the HTTP port automatically.
+
+### Build the image
 
 ```powershell
-.\docs\gerar_diagramas.ps1
+docker build -t inventory-api .
 ```
 
-Arquivos gerados para o relatorio:
+### Run the container
 
-- `docs/diagrama_classes_graphviz.pdf`
-- `docs/diagrama_classes_graphviz.svg`
+Pass the PostgreSQL settings with `--env-file` or individual `-e` flags. The
+example below publishes the API on `http://localhost:2020`.
 
-A documentacao navegavel gerada pelo Doxygen fica em:
-
-```text
-docs/doxygen/html/index.html
+```powershell
+docker run --name inventory-api `
+  --env-file .env `
+  -p 2020:2020 `
+  inventory-api
 ```
 
-## Arquivo de dados
+If your PostgreSQL instance is running on your host machine instead of inside
+Docker, do not keep `POSTGRES_HOST=127.0.0.1` in that env file. From inside the
+container, `127.0.0.1` points to the container itself. On Docker Desktop, use
+`POSTGRES_HOST=host.docker.internal`. If the database runs in another
+container, use the other container's service name on the same Docker network.
 
-O programa cria o arquivo `data/estoque.txt` automaticamente ao salvar.
-O formato usa uma linha para o item e uma linha para cada movimento:
+If your cloud platform provides `PORT`, the container will bind to that port
+automatically. Locally, `APP_PORT` still works the same way as before.
 
-```text
-ITEM|codigo|tipo|nome|descricao|linkInformacoes|quantidade|preco|localizacao
-MOV|codigo|operacao|quantidade|observacao
+### Monitor the container
+
+```powershell
+docker logs -f inventory-api
+docker ps
+docker inspect --format='{{json .State.Health}}' inventory-api
+docker stats inventory-api
 ```
 
-Exemplo:
+## Endpoints
+### Health
 
-```text
-ITEM|D001|produto|Mouse sem fio|Mouse sem fio para computadores.|https://www.google.com/search?tbm=isch&q=mouse+sem+fio|10|89.900000|Prateleira A1
-MOV|D001|Entrada|10|Cadastro inicial.
+```http
+GET /health
+```
+
+### List movements
+
+```http
+GET /api/movements
+```
+
+### List items
+
+```http
+GET /api/items
+GET /api/items?search=mouse
+```
+
+### Get an item by code
+
+```http
+GET /api/items/D001
+```
+
+### Create an item
+
+```http
+POST /api/items
+Content-Type: application/json
+```
+
+```json
+{
+  "code": "D001",
+  "item_type": "product",
+  "name": "Wireless Mouse",
+  "description": "Mouse for office use.",
+  "information_link": "https://example.com/mouse",
+  "quantity": 10,
+  "unit_price": 89.9,
+  "location": "Shelf A1"
+}
+```
+
+### Update an item
+
+```http
+PATCH /api/items/D001
+Content-Type: application/json
+```
+
+```json
+{
+  "description": "Ergonomic wireless mouse.",
+  "unit_price": 99.5,
+  "location": "Shelf B2"
+}
+```
+
+### Register inbound stock
+
+```http
+POST /api/items/D001/inbound
+Content-Type: application/json
+```
+
+```json
+{
+  "quantity": 5,
+  "note": "Weekly replenishment."
+}
+```
+
+### Register outbound stock
+
+```http
+POST /api/items/D001/outbound
+Content-Type: application/json
+```
+
+```json
+{
+  "quantity": 3,
+  "note": "Separated for customer order."
+}
+```
+
+### Delete an item
+
+```http
+DELETE /api/items/D001
 ```
